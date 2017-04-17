@@ -21,6 +21,7 @@ class Func{
     }
 
     public static function sizecount($filesize) {
+        if($filesize == null) return '未知大小';
         if($filesize >= 1073741824) {
             $filesize = round($filesize / 1073741824 * 100) / 100 . ' gb';
         } elseif($filesize >= 1048576) {

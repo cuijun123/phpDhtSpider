@@ -18,7 +18,6 @@ class Metadata
     {
         try {
             $packet = self::send_handshake($client, $infohash);
-            //var_dump($packet);
 
             if ($packet == false) {
                 return false;
@@ -30,12 +29,12 @@ class Metadata
                 return false;
             }
 
+
             $packet = self::send_ext_handshake($client);
 
             if ($packet == false) {
                 return false;
             }
-
 
             $ut_metadata = self::get_ut_metadata($packet);
             $metadata_size = self::get_metadata_size($packet);
@@ -46,7 +45,13 @@ class Metadata
             $piecesNum = ceil($metadata_size / (self::$PIECE_LENGTH));//2 ^ 14
             for ($i = 0; $i < $piecesNum; $i++) {
                 self::request_metadata($client, $ut_metadata, $i);
-                $packet = self::recvall($client);
+                for ($j=0;$j<3;$j++){ //失败尝试3次
+                    $packet = self::recvall($client);
+                    if($packet != false){
+                        break;
+                    }
+                }
+
                 $ee = substr($packet,0,strpos($packet,"ee")+2);
                 $dict = Base::decode(substr($ee,strpos($packet,"d")));
 
@@ -102,37 +107,22 @@ class Metadata
 
     public static function recvall($client)
     {
-
-/*        $data = '';
-        try {
-            $data = $client->recv($size, swoole_client::MSG_PEEK | swoole_client::MSG_WAITALL);
-        } catch (Exception $e) {
-            var_dump($e->getMessage());
+        $data_length = $client->recv(4, 0);
+        if($data_length === false){
+            return false;
         }
-
-        return $data;*/
-
-        $total_data = array();
+        $data_length = intval(unpack('N',$data_length)[1]);
         $data = '';
-        $begin = time();
-        while (true) {
-            usleep(5);
-            if ($total_data && ((time() - $begin) > 5)) {
+        while (true){
+            if($data_length > 8192){
+                $data .= $client->recv(8192, 0);
+                $data_length = $data_length - 8192;
+            }else{
+                $data .= $client->recv($data_length, 0);
                 break;
-            } elseif ((time() - $begin) > 5 * 2) {
-                break;
-            }
-            try {
-                $data = $client->recv(1024, 0);
-                if ($data) {
-                    $total_data[] = $data;
-                    $begin = time();
-                }
-            } catch (Exception $e) {
-
             }
         }
-        return implode('', $total_data);
+        return $data;
     }
 
     public static function send_handshake($client, $infohash)
@@ -144,7 +134,7 @@ class Metadata
         $packet = $bt_header . $ext_bytes . $infohash . $peer_id;
         $client->send($packet);
         $data = $client->recv(4096, 0);
-        if ($data === false) {
+        if ($data == false) {
             return false;
         }
         return $data;

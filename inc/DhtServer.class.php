@@ -208,6 +208,14 @@ class DhtServer
         DhtClient::send_response($msg, $address);
         $ip = $address[0];
 
+        //$client = new swoole_client(SWOOLE_SOCK_TCP | SWOOLE_SOCK_ASYNC);
+/*        $client = new swoole_client(SWOOLE_TCP | SWOOLE_KEEP);
+        if($client->connect($ip, $port,0.5))
+        {
+            echo 'Ip:' . $ip . ' Port:' . $port .' connent success!'. PHP_EOL;
+            Metadata::download_metadata($client,$infohash);
+            $client->close();
+        }*/
 
         $process = new swoole_process(function(swoole_process $worker) use($ip,$port,$infohash){
             //$client = new swoole_client(SWOOLE_TCP | SWOOLE_KEEP);

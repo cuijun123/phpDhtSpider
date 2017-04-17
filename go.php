@@ -4,7 +4,7 @@ error_reporting(E_ERROR );
 ini_set("memory_limit","1024M");
 define('BASEPATH', dirname(__FILE__));
 define('WORKER_NUM', 1);// 主进程数, 一般为CPU的1至4倍 同时执行任务数量
-define('MAX_REQUEST', 1000);// 允许最大连接数, 不可大于系统ulimit -n的值
+define('MAX_REQUEST', 65535);// 允许最大连接数, 不可大于系统ulimit -n的值
 define('AUTO_FIND_TIME', 3000);//定时寻找节点时间间隔 /毫秒
 define('MAX_NODE_SIZE', 300);//保存node_id最大数量
 
