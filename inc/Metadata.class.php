@@ -71,7 +71,7 @@ class Metadata
 
             $_data = [];
             $metadata = Base::decode($metadata);
-            if($metadata['name'] !=''){
+            if(isset($metadata['name']) && $metadata['name'] !=''){
                 $_data['name'] = $metadata['name'];
                 $_data['files'] = isset($metadata['files']) ? $metadata['files'] : '';
                 $_data['length'] = $metadata['length'];
@@ -95,7 +95,6 @@ class Metadata
     public static function request_metadata($client, $ut_metadata, $piece)
     {
         $msg = chr(self::$BT_MSG_ID) . chr($ut_metadata) . Base::encode(array("msg_type" => 0, "piece" => $piece));
-        define('BIG_ENDIAN', pack('L', 1) === pack('N', 1));
         $msg_len = pack("I", strlen($msg));
         if (!BIG_ENDIAN) {
             $msg_len = strrev($msg_len);
@@ -132,7 +131,10 @@ class Metadata
         $ext_bytes = "\x00\x00\x00\x00\x00\x10\x00\x00";
         $peer_id = Base::get_node_id();
         $packet = $bt_header . $ext_bytes . $infohash . $peer_id;
-        $client->send($packet);
+        $rs = $client->send($packet);
+        if($rs == false){
+            return false;
+        }
         $data = $client->recv(4096, 0);
         if ($data == false) {
             return false;
@@ -166,8 +168,6 @@ class Metadata
     public static function send_ext_handshake($client)
     {
         $msg = chr(self::$BT_MSG_ID) . chr(self::$EXT_HANDSHAKE_ID) . Base::encode(array("m" => array("ut_metadata" => 1)));//{"m":{"ut_metadata": 1}
-
-        define('BIG_ENDIAN', pack('L', 1) === pack('N', 1));
         $msg_len = pack("I", strlen($msg));
         if (!BIG_ENDIAN) {
             $msg_len = strrev($msg_len);
