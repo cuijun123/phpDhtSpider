@@ -73,17 +73,23 @@ class Metadata
 
             $_data = [];
             $metadata = Base::decode($metadata);
+            //Func::Logs(var_export($metadata,1),3);
+            $_infohash = strtoupper(bin2hex($infohash));
             if(isset($metadata['name']) && $metadata['name'] !=''){
-                $_data['name'] = $metadata['name'];
+                $_data['name'] = Func::characet($metadata['name']);
+                $_data['infohash'] = $_infohash;
                 $_data['files'] = isset($metadata['files']) ? $metadata['files'] : '';
                 $_data['length'] = isset($metadata['length']) ? $metadata['length'] : 0;
-                $_data['length_format'] = Func::sizecount($_data['length']);
-                $_data['magnetUrl'] = 'magnet:?xt=urn:btih:'.strtoupper(bin2hex($infohash));
+                $_data['piece_length'] = isset($metadata['piece length']) ? $metadata['piece length'] : 0;
+                //$_data['length_format'] = Func::sizecount($_data['length']);
+                //$_data['magnetUrl'] = 'magnet:?xt=urn:btih:'.$_infohash;
                 unset($metadata);
             }else{
                 return false;
             }
-            Func::Logs(date('Y-m-d H:i:s').': '.$_data['name'].'['.$_data['magnetUrl'].']'.PHP_EOL.PHP_EOL,2);
+            return $_data;
+            //Func::Logs(date('Y-m-d H:i:s').': '.$_data['name'].'['.$_data['magnetUrl'].']'.PHP_EOL.PHP_EOL,2);
+            //echo $_data['name'].PHP_EOL;
             //var_dump(var_export($_data,1));
             // Func::Logs(var_export($_data,1),3);
 

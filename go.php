@@ -18,12 +18,19 @@ require_once BASEPATH .'/inc/Func.class.php';
 require_once BASEPATH . '/inc/DhtClient.class.php';
 require_once BASEPATH . '/inc/DhtServer.class.php';
 require_once BASEPATH . '/inc/Metadata.class.php';
+require_once BASEPATH . '/inc/Db.class.php';
 
 $nid = Base::get_node_id();// 伪造设置自身node id
 $table = array();// 初始化路由表
 $queue = new SplQueue;
 $time = microtime(true);
 $workers = array();
+Db::$config = array(
+            'host'=>'127.0.0.1',
+            'user'=>'root',
+            'pass'=>'cuijun123',
+            'name'=>'dht',
+        );
 // 长期在线node
 $bootstrap_nodes = array(
     array('router.bittorrent.com', 6881),
@@ -35,6 +42,7 @@ Func::Logs(date('Y-m-d H:i:s', time()) . " - 服务启动...".PHP_EOL,1);//记�
 //SWOOLE_PROCESS 使用进程模式，业务代码在Worker进程中执行
 //SWOOLE_SOCK_UDP 创建udp socket
 $serv = new swoole_server('0.0.0.0', 6882, SWOOLE_PROCESS, SWOOLE_SOCK_UDP);
+
 $serv->set(array(
     'worker_num' => WORKER_NUM,//设置启动的worker进程数
     'daemonize' => true,
@@ -67,14 +75,24 @@ $serv->on('WorkerStart', function($serv, $worker_id){
                            // echo ("connect failed. Error: {$client->errCode}".PHP_EOL);
                         }else{
                             //echo 'connent success! '.$data[0].':'.$data[1].PHP_EOL;
-                            Metadata::download_metadata($client,$data[2]);
+                            $rs = Metadata::download_metadata($client,$data[2]);
+                            if($rs !== false){
+                                //echo  $rs['name'].PHP_EOL;
+                                $data = Db::get_one("select 1 from history where infohash = '$rs[infohash]' limit 1");
+                                if(!$data){
+                                    Db::insert('history',array('infohash'=>$rs['infohash']));
+                                    Db::insert('bt',array('name'=>$rs['name'],'infohash'=>$rs['infohash'],'files'=>($rs['files'] !='' ? json_encode($rs['files']) :''),'length'=>$rs['length'],'piece_length'=>$rs['piece_length'],'hits'=>0,'time'=>date('Y-m-d H:i:s')));
+                                }else{
+                                    //Db::update('bt',array('hot'=>'hot+\'1\''),"infohash = '$rs[infohash]'");
+                                    Db::query("update bt set `hot` = `hot` + 1 where infohash = '$rs[infohash]'");
+
+                                }
+                            }
                             $client->close(true);
                         }
                         $worker->exit(0);
                     }, false);
                     $pid = $process->start();
-                    //swoole_process::wait();
-                    //$workers[$pid] = $process;
             }
     });
 });
