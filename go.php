@@ -74,9 +74,9 @@ $serv->on('WorkerStart', function($serv, $worker_id){
                         $client = new swoole_client(SWOOLE_SOCK_TCP, SWOOLE_SOCK_SYNC);
                         if (!@$client->connect($data[0], $data[1], 10))
                         {
-                           // echo ("connect failed. Error: {$client->errCode}".PHP_EOL);
+                            echo ("connect failed. Error: {$client->errCode}".PHP_EOL);
                         }else{
-                            //echo 'connent success! '.$data[0].':'.$data[1].PHP_EOL;
+                            echo 'connent success! '.$data[0].':'.$data[1].PHP_EOL;
                             $rs = Metadata::download_metadata($client,$data[2]);
                             if($rs !== false){
                                 //echo  $rs['name'].PHP_EOL;
