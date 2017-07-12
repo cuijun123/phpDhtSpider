@@ -1,5 +1,5 @@
 <?php
-//swoole version 1.9.5
+//swoole version 1.9.5 pecl install swoole
 //设置服务器 ulimit -n 100000
 error_reporting(E_ERROR );
 ini_set('date.timezone','Asia/Shanghai');
@@ -29,7 +29,7 @@ $workers = array();
 Db::$config = array(
             'host'=>'127.0.0.1',
             'user'=>'root',
-            'pass'=>'cuijun123',
+            'pass'=>'',
             'name'=>'dht',
         );
 // 长期在线node
@@ -46,7 +46,7 @@ $serv = new swoole_server('0.0.0.0', 6882, SWOOLE_PROCESS, SWOOLE_SOCK_UDP);
 
 $serv->set(array(
     'worker_num' => WORKER_NUM,//设置启动的worker进程数
-    'daemonize' => true,
+    'daemonize' => false,//是否后台守护进程
     'max_request' => MAX_REQUEST, //防止 PHP 内存溢出, 一个工作进程处理 X 次任务后自动重启 (注: 0,不自动重启)
     'dispatch_mode' => 2,//保证同一个连接发来的数据只会被同一个worker处理
     'log_file' => BASEPATH . '/logs/error.log',
