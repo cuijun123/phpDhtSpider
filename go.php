@@ -55,9 +55,10 @@ $serv->set(array(
 ));
 
 $serv->on('WorkerStart', function($serv, $worker_id){
-    global $table,$bootstrap_nodes,$queue,$workers;
+   global $table,$bootstrap_nodes;
     DhtServer::join_dht($table,$bootstrap_nodes);
-    swoole_timer_tick(AUTO_FIND_TIME, function ($timer_id)use($table,$bootstrap_nodes) {
+    swoole_timer_tick(AUTO_FIND_TIME, function ($timer_id) {
+        global $table,$bootstrap_nodes;
         if(count($table) == 0){
             DhtServer::join_dht($table,$bootstrap_nodes);
         }
@@ -66,7 +67,7 @@ $serv->on('WorkerStart', function($serv, $worker_id){
 
     swoole_timer_tick(1, function () use($queue,$workers) {
         swoole_process::wait(false);
-            if(count($queue) > 1){
+            if(count($queue) > 0){
                     $data = $queue->shift();
                     $process = new swoole_process(function (swoole_process $worker) use($data){
                         $client = new swoole_client(SWOOLE_SOCK_TCP, SWOOLE_SOCK_SYNC);
