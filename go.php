@@ -118,30 +118,30 @@ $serv->on('Receive', function($serv, $fd, $from_id, $data){
         //return false;
     }
 
-    if(strlen($data) == 0){
-        $serv->close($fd,true);
-        return false;
-    }
+    //if(strlen($data) == 0){
+        //$serv->close($fd,true);
+        //return false;
+    //}
     $msg = Base::decode($data);
-    if(!isset($msg['y'])){
-        $serv->close($fd,true);
-        return false;
-    };
+    //if(!isset($msg['y'])){
+        //$serv->close($fd,true);
+        //return false;
+    //};
     $fdinfo = $serv->connection_info($fd, $from_id);
     if($msg['y'] == 'r'){
         // 如果是回复, 且包含nodes信息 添加到路由表
         if(array_key_exists('nodes', $msg['r'])){
             DhtClient::response_action($msg, array($fdinfo['remote_ip'], $fdinfo['remote_port']));
         }else{
-            $serv->close($fd,true);
-            return false;
+            //$serv->close($fd,true);
+            //return false;
         }
     }elseif($msg['y'] == 'q'){
         // 如果是请求, 则执行请求判断
         DhtClient::request_action($msg, array($fdinfo['remote_ip'], $fdinfo['remote_port']));
     }else{
-        $serv->close($fd,true);
-        return false;
+        //$serv->close($fd,true);
+        //return false;
     }
 });
 
