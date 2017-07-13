@@ -195,6 +195,10 @@ class DhtClient
         if ($port >= 65536 || $port <= 0) {
             return;
         }
+        
+		if($port == 6881){ //6881端口基本被封
+			return;
+		}
 
         if ($tid == '') {
             //return;
