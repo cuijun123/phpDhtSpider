@@ -1,6 +1,10 @@
 <?php
-//swoole version 1.9.5 pecl install swoole
-//设置服务器 ulimit -n 100000
+//swoole version 1.9.5
+/*
+ * 安装swoole pecl install swoole
+ * 设置服务器 ulimit -n 100000
+ * 关闭防火墙和后台规则
+ */
 error_reporting(E_ERROR );
 ini_set('date.timezone','Asia/Shanghai');
 //ini_set("memory_limit","1024M");
@@ -25,7 +29,6 @@ $nid = Base::get_node_id();// 伪造设置自身node id
 $table = array();// 初始化路由表
 $queue = new SplQueue;
 $time = microtime(true);
-$workers = array();
 Db::$config = array(
             'host'=>'127.0.0.1',
             'user'=>'root',
@@ -66,7 +69,8 @@ $serv->on('WorkerStart', function($serv, $worker_id){
         DhtServer::auto_find_node($table,$bootstrap_nodes);
     });
 
-    swoole_timer_tick(1, function () use($queue,$workers) {
+    swoole_timer_tick(1, function (){
+        global $queue;
         swoole_process::wait(false);
             if(count($queue) > 0){
                     $data = $queue->shift();
@@ -79,13 +83,12 @@ $serv->on('WorkerStart', function($serv, $worker_id){
                             echo 'connent success! '.$data[0].':'.$data[1].PHP_EOL;
                             $rs = Metadata::download_metadata($client,$data[2]);
                             if($rs !== false){
-                                //echo  $rs['name'].PHP_EOL;
+                                echo  $rs['name'].PHP_EOL;
                                 $data = Db::get_one("select 1 from history where infohash = '$rs[infohash]' limit 1");
                                 if(!$data){
                                     Db::insert('history',array('infohash'=>$rs['infohash']));
                                     Db::insert('bt',array('name'=>$rs['name'],'infohash'=>$rs['infohash'],'files'=>($rs['files'] !='' ? json_encode($rs['files']) :''),'length'=>$rs['length'],'piece_length'=>$rs['piece_length'],'hits'=>0,'time'=>date('Y-m-d H:i:s')));
                                 }else{
-                                    //Db::update('bt',array('hot'=>'hot+\'1\''),"infohash = '$rs[infohash]'");
                                     Db::query("update bt set `hot` = `hot` + 1 where infohash = '$rs[infohash]'");
 
                                 }
@@ -110,7 +113,6 @@ $serv->on('Receive', function($serv, $fd, $from_id, $data){
     if(microtime(true) - $time < MAX_UDP_CONNENT_SEC){
         //return false;
     }
-    //echo (microtime(true)).PHP_EOL;
 
     $time = microtime(true);
 
@@ -118,34 +120,29 @@ $serv->on('Receive', function($serv, $fd, $from_id, $data){
         //return false;
     }
 
-    //if(strlen($data) == 0){
-        //$serv->close($fd,true);
-        //return false;
-    //}
-    $msg = Base::decode($data);
-    //if(!isset($msg['y'])){
-        //$serv->close($fd,true);
-        //return false;
-    //};
-    $fdinfo = $serv->connection_info($fd, $from_id);
-    if($msg['y'] == 'r'){
-        // 如果是回复, 且包含nodes信息 添加到路由表
-        if(array_key_exists('nodes', $msg['r'])){
-            DhtClient::response_action($msg, array($fdinfo['remote_ip'], $fdinfo['remote_port']));
-        }else{
-            //$serv->close($fd,true);
-            //return false;
+    if(strlen($data) == 0){
+        return false;
+    }
+
+    try{
+        $fdinfo = $serv->connection_info($fd, $from_id);
+        $msg = Base::decode($data);
+        if($msg['y'] == 'r'){
+            // 如果是回复, 且包含nodes信息 添加到路由表
+            if(array_key_exists('nodes', $msg['r'])){
+                DhtClient::response_action($msg, array($fdinfo['remote_ip'], $fdinfo['remote_port']));
+            }else{
+                //$serv->close($fd,true);
+                //return false;
+            }
+        }elseif($msg['y'] == 'q'){
+            // 如果是请求, 则执行请求判断
+            DhtClient::request_action($msg, array($fdinfo['remote_ip'], $fdinfo['remote_port']));
         }
-    }elseif($msg['y'] == 'q'){
-        // 如果是请求, 则执行请求判断
-        DhtClient::request_action($msg, array($fdinfo['remote_ip'], $fdinfo['remote_port']));
-    }else{
-        //$serv->close($fd,true);
-        //return false;
+    }catch (Exception $e){
+
     }
 });
-
-
 
 $serv->start();
 
