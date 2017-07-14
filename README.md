@@ -8,6 +8,7 @@ swoole version 1.9.5
 PHP Version 5.6.22
 
 #########运行说明##############
+
 1.php安装swoole拓展 (pecl install swoole 默认安装1.9.5版本)
 
 2.设置服务器 ulimit -n 100000
