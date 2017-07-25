@@ -83,15 +83,17 @@ $serv->on('Receive', function($serv, $fd, $from_id, $data){
     if(strlen($data) == 0){
         return false;
     }
+    $fdinfo = $serv->connection_info($fd, $from_id);
+    $msg = Base::decode($data);
 
     if(microtime(true) - $time < MAX_UDP_CONNENT_SEC){
-        return false;
+        if($msg['q'] != 'announce_peer'){
+            return false;
+        }
     }
     $time = microtime(true);
 
     try{
-        $fdinfo = $serv->connection_info($fd, $from_id);
-        $msg = Base::decode($data);
         if(!isset($msg['y'])){
             return false;
         }
@@ -105,7 +107,7 @@ $serv->on('Receive', function($serv, $fd, $from_id, $data){
             DhtClient::request_action($msg, array($fdinfo['remote_ip'], $fdinfo['remote_port']));
         }
     }catch (Exception $e){
-        var_dump($e->getMessage());
+        //var_dump($e->getMessage());
     }
 });
 
