@@ -48,4 +48,24 @@ class Func
         }
         return $data;
     }
+
+    public static function getKeyWords($title){
+        if($title == ''){
+            return '';
+        }
+        $title = explode(' ',$title);
+        if(!is_array($title)){
+            return '';
+        }
+        $title = str_replace(',','',$title);
+        foreach ($title as $key=> $value){
+            if(strlen($value) < 5){
+                unset($title[$key]);
+            }
+            if(strpos($value,'.') !== false){
+                unset($title[$key]);
+            }
+        }
+        return implode(',',$title);
+    }
 }

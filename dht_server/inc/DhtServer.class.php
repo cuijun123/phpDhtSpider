@@ -17,7 +17,7 @@ class DhtServer{
             $node = array_shift($table);
             // 发送查找find_node到node中
             self::find_node(array($node->ip, $node->port), $node->nid);
-            usleep($wait);
+          //  usleep($wait);
         }
     }
 
@@ -49,6 +49,8 @@ class DhtServer{
         {
             return false;
         }
-        $serv->sendto($address[0], $address[1], Base::encode($msg));
+		$ip = $address[0];
+		$data = Base::encode($msg);
+        $serv->sendto($ip, $address[1], $data);
     }
 }

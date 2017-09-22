@@ -7,14 +7,14 @@
  */
 error_reporting(E_ERROR );
 ini_set('date.timezone','Asia/Shanghai');
-//ini_set("memory_limit","1024M");
+ini_set("memory_limit","-1");
 define('BASEPATH', dirname(__FILE__));
-define('WORKER_NUM', 1);// 主进程数, 一般为CPU的1至4倍 同时执行任务数量
+$config = require_once BASEPATH.'/config.php';
 define('MAX_REQUEST', 0);// 允许最大连接数, 不可大于系统ulimit -n的值
 define('AUTO_FIND_TIME', 3000);//定时寻找节点时间间隔 /毫秒
 define('MAX_NODE_SIZE', 300);//保存node_id最大数量
-define('MAX_UDP_CONNENT_SEC', 0.001);//多少秒允许一次udp链接 防止cpu占用过高
 define('BIG_ENDIAN', pack('L', 1) === pack('N', 1));
+
 require_once BASEPATH . '/inc/Node.class.php'; //node_id类
 require_once BASEPATH . '/inc/Bencode.class.php';//bencode编码解码类
 require_once BASEPATH .'/inc/Base.class.php';//基础操作类
@@ -22,12 +22,10 @@ require_once BASEPATH .'/inc/Func.class.php';
 require_once BASEPATH . '/inc/DhtClient.class.php';
 require_once BASEPATH . '/inc/DhtServer.class.php';
 require_once BASEPATH . '/inc/Metadata.class.php';
-require_once BASEPATH . '/inc/Db.class.php';
 
 $nid = Base::get_node_id();// 伪造设置自身node id
 $table = array();// 初始化路由表
 $time = microtime(true);
-
 // 长期在线node
 $bootstrap_nodes = array(
     array('router.bittorrent.com', 6881),
@@ -35,22 +33,14 @@ $bootstrap_nodes = array(
     array('router.utorrent.com', 6881)
 );
 
-Db::$config = array(
-    'host'=>'127.0.0.1',
-    'user'=>'root',
-    'pass'=>'',
-    'name'=>'dht',
-);
-
-
 Func::Logs(date('Y-m-d H:i:s', time()) . " - 服务启动...".PHP_EOL,1);//记录启动日志
 
 //SWOOLE_PROCESS 使用进程模式，业务代码在Worker进程中执行
 //SWOOLE_SOCK_UDP 创建udp socket
 $serv = new swoole_server('0.0.0.0', 6882, SWOOLE_PROCESS, SWOOLE_SOCK_UDP);
 $serv->set(array(
-    'worker_num' => WORKER_NUM,//设置启动的worker进程数
-    'daemonize' => false,//是否后台守护进程
+    'worker_num' => $config['worker_num'],//设置启动的worker进程数
+    'daemonize' => $config['daemonize'],//是否后台守护进程
     'max_request' => MAX_REQUEST, //防止 PHP 内存溢出, 一个工作进程处理 X 次任务后自动重启 (注: 0,不自动重启)
     'dispatch_mode' => 2,//保证同一个连接发来的数据只会被同一个worker处理
     'log_file' => BASEPATH . '/logs/error.log',
@@ -58,6 +48,7 @@ $serv->set(array(
     'heartbeat_check_interval' => 5, //启用心跳检测，此选项表示每隔多久轮循一次，单位为秒
     'heartbeat_idle_time' => 10, //与heartbeat_check_interval配合使用。表示连接最大允许空闲的时间
 ));
+
 
 $serv->on('WorkerStart', function($serv, $worker_id){
    global $table,$bootstrap_nodes;
@@ -69,6 +60,13 @@ $serv->on('WorkerStart', function($serv, $worker_id){
         }
         DhtServer::auto_find_node($table,$bootstrap_nodes);
     });
+
+	swoole_process::signal(SIGCHLD, function($sig) {
+	  //必须为false，非阻塞模式
+	  while($ret =  swoole_process::wait(false)) {
+		//  echo "PID={$ret['pid']}\n";
+	  }
+	});
 });
 
 /*
@@ -77,22 +75,12 @@ $fd，TCP客户端连接的文件描述符
 $from_id，TCP连接所在的Reactor线程ID
 $data，收到的数据内容，可能是文本或者二进制内容
  */
-$serv->on('Receive', function($serv, $fd, $from_id, $data){
-    global $time;
-
+$serv->on('Packet', function($serv, $data, $fdinfo){
     if(strlen($data) == 0){
         return false;
     }
-    $fdinfo = $serv->connection_info($fd, $from_id);
+
     $msg = Base::decode($data);
-
-    if(microtime(true) - $time < MAX_UDP_CONNENT_SEC){
-        if($msg['q'] != 'announce_peer'){
-            return false;
-        }
-    }
-    $time = microtime(true);
-
     try{
         if(!isset($msg['y'])){
             return false;
@@ -100,11 +88,11 @@ $serv->on('Receive', function($serv, $fd, $from_id, $data){
         if($msg['y'] == 'r'){
             // 如果是回复, 且包含nodes信息 添加到路由表
             if(array_key_exists('nodes', $msg['r'])){
-                DhtClient::response_action($msg, array($fdinfo['remote_ip'], $fdinfo['remote_port']));
+                DhtClient::response_action($msg, array($fdinfo['address'], $fdinfo['port']));
             }
         }elseif($msg['y'] == 'q'){
             // 如果是请求, 则执行请求判断
-            DhtClient::request_action($msg, array($fdinfo['remote_ip'], $fdinfo['remote_port']));
+            DhtClient::request_action($msg, array($fdinfo['address'], $fdinfo['port']));
         }
     }catch (Exception $e){
         //var_dump($e->getMessage());

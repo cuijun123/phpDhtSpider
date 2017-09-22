@@ -7,6 +7,7 @@ class DhtClient
     public static $BT_MSG_ID = 20;
     public static $EXT_HANDSHAKE_ID = 0;
     public static $PIECE_LENGTH = 16384;
+    public static $last_ip = '';
 
     /**
      * 处理接收到的find_node回复
@@ -39,6 +40,7 @@ class DhtClient
      */
     public static function request_action($msg, $address)
     {
+	
         switch ($msg['q']) {
             case 'ping'://确认你是否在线
                 //echo '朋友'.$address[0].'正在确认你是否在线'.PHP_EOL;
@@ -46,7 +48,7 @@ class DhtClient
                 break;
             case 'find_node': //向服务器发出寻找节点的请求
                 //echo '朋友'.$address[0].'向你发出寻找节点的请求'.PHP_EOL;
-                self::on_find_node($msg, $address);
+                //self::on_find_node($msg, $address);
                 break;
             case 'get_peers':
                 //echo '朋友'.$address[0].'向你发出查找资源的请求'.PHP_EOL;
@@ -115,11 +117,12 @@ class DhtClient
 
     public static function on_find_node($msg, $address)
     {
+		
         global $nid;
-
         // 获取对端node id
         $id = $msg['a']['id'];
         // 生成回复数据
+	
         $msg = array(
             't' => $msg['t'],
             'y' => 'r',
@@ -128,7 +131,6 @@ class DhtClient
                 'nodes' => Base::encode_nodes(self::get_nodes(16))
             )
         );
-
         // 将node加入路由表
         self::append(new Node($id, $address[0], $address[1]));
         // 发送回复数据
@@ -176,7 +178,7 @@ class DhtClient
      */
     public static function on_announce_peer($msg, $address)
     {
-        global $nid,$serv;
+        global $nid,$config;
         $infohash = $msg['a']['info_hash'];
         $port = $msg['a']['port'];
         $token = $msg['a']['token'];
@@ -212,52 +214,39 @@ class DhtClient
 
         // 发送请求回复
         DhtServer::send_response($msg, $address);
-        $ip = $address[0];
-        swoole_process::wait(false);
-        $process = new swoole_process(function (swoole_process $worker) use($ip,$port,$infohash){
+
+        if($address[0] == self::$last_ip){
+            return;
+        }
+        self::$last_ip = $ip = $address[0];
+
+        // 发送请求回复
+        DhtServer::send_response($msg, $address);
+   
+        //swoole_process::wait(false);
+        $process = new swoole_process(function (swoole_process $worker) use($ip,$port,$infohash,$config){
             $client = new swoole_client(SWOOLE_SOCK_TCP, SWOOLE_SOCK_SYNC);
-            if (!@$client->connect($ip, $port, 2))
+            if (!@$client->connect($ip, $port, 5))
             {
                 // echo ("connect failed. Error: {$client->errCode}".PHP_EOL);
             }else{
-                echo 'connent success! '.$ip.':'.$port.PHP_EOL;
+                //echo 'connent success! '.$ip.':'.$port.PHP_EOL;
                 $rs = Metadata::download_metadata($client,$infohash);
                 if($rs != false){
-                    echo  $rs['name'].PHP_EOL;
-                    $data = Db::get_one("select 1 from history where infohash = '$rs[infohash]' limit 1");
-                    if(!$data){
-                        Db::insert('history',array('infohash'=>$rs['infohash']));
-                        $files = '';
-                        $length = 0;
-                        if($rs['files'] !=''){
-                            $files = json_encode($rs['files']);
-                            foreach ($rs['files'] as $value){
-                                $length += $value['length'];
-                            }
-                        }else{
-                            $length = $rs['length'];
-                        }
-                        Db::insert('bt',array(
-                                'name'=>$rs['name'],
-                                'keywords'=>Func::getKeyWords($rs['name']),
-                                'infohash'=>$rs['infohash'],
-                                'files'=>$files,
-                                'length'=>$length,
-                                'piece_length'=>$rs['piece_length'],
-                                'hits'=>0,
-                                'time'=>date('Y-m-d H:i:s'),
-                                'lasttime'=>date('Y-m-d H:i:s'),
-                            )
-                        );
-                    }else{
-                        Db::query("update bt set `hot` = `hot` + 1 where infohash = '$rs[infohash]'");
-                    }
+                    //echo $ip.':'.$port.' udp send！'.PHP_EOL;
+                    DhtServer::send_response($rs,array($config['server_ip'],$config['server_port']));
+                    //echo  $rs['name'].PHP_EOL;
+                }else{
+                    //echo 'false'.date('Y-m-d H:i:s').PHP_EOL;
                 }
                 $client->close(true);
             }
             $worker->exit(0);
+            $worker->close();
         }, false);
         $process->start();
+		//swoole_process::wait(false);
+        //echo $ip.PHP_EOL;
     }
 
 public static function get_nodes($len = 8)
@@ -266,13 +255,14 @@ public static function get_nodes($len = 8)
 
     if (count($table) <= $len)
         return $table;
+	
+	//shuffle($table);
 
     $nodes = array();
 
     for ($i = 0; $i < $len; $i++) {
-        $nodes[] = $table[mt_rand(0, count($table) - 1)];
+        $nodes[] = $table[$i];
     }
-
     return $nodes;
 }
 
